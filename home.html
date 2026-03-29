@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CryptoWatch — Live Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#090b10;--s1:#0e1118;--s2:#131720;
+  --b:rgba(255,255,255,0.06);
+  --g:#00e676;--r:#ff3d5a;--am:#ffb300;--bl:#448aff;
+  --tx:#eef0f4;--mu:#4a5568;--mu2:#1e2533;
+  --mono:'Space Mono',monospace;--dis:'Syne',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--tx);font-family:var(--dis);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,230,118,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,230,118,0.025) 1px,transparent 1px);background-size:40px 40px;z-index:0;pointer-events:none}
+.app{position:relative;z-index:1;max-width:1440px;margin:0 auto;padding:20px 16px}
+
+/* TOPBAR */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--s1);border:1px solid var(--b);border-radius:14px;margin-bottom:16px;gap:12px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:10px;font-family:var(--dis);font-size:1.25rem;font-weight:800;letter-spacing:-.5px}
+.ldot{width:9px;height:9px;border-radius:50%;background:var(--g);box-shadow:0 0 10px var(--g);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 8px var(--g)}50%{box-shadow:0 0 22px var(--g),0 0 44px rgba(0,230,118,.3)}}
+.badge{display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:100px;font-size:.78rem;font-family:var(--mono);font-weight:700;letter-spacing:.05em;border:1px solid;transition:all .4s}
+.badge.ok{background:rgba(0,230,118,.1);color:var(--g);border-color:rgba(0,230,118,.3)}
+.badge.err{background:rgba(255,61,90,.1);color:var(--r);border-color:rgba(255,61,90,.3)}
+.badge.wait{background:rgba(255,179,0,.1);color:var(--am);border-color:rgba(255,179,0,.3)}
+.bdot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 1.5s infinite}
+.nxt{font-family:var(--mono);font-size:.72rem;color:var(--mu)}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+@media(max-width:650px){.stats{grid-template-columns:repeat(2,1fr)}}
+.sc{background:var(--s1);border:1px solid var(--b);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden;transition:border-color .3s}
+.sc::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--g),transparent);opacity:0;transition:opacity .3s}
+.sc:hover{border-color:rgba(0,230,118,.2)}.sc:hover::after{opacity:1}
+.sl{font-size:.7rem;color:var(--mu);font-family:var(--mono);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+.sv{font-size:1.8rem;font-weight:800;font-family:var(--mono);line-height:1}
+.sv.g{color:var(--g)}.sv.r{color:var(--r)}.sv.b{color:var(--bl)}.sv.w{color:var(--tx)}
+
+/* CONTROLS */
+.controls{background:var(--s1);border:1px solid var(--b);border-radius:12px;padding:16px 20px;margin-bottom:16px}
+.ctrl-row{display:flex;align-items:flex-end;flex-wrap:wrap;gap:16px}
+.cl{font-size:.7rem;color:var(--mu);font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+.ci{background:var(--bg);border:1px solid var(--b);border-radius:8px;color:var(--tx);font-family:var(--mono);font-size:.88rem;padding:8px 12px;width:150px;transition:border-color .2s}
+.ci:focus{outline:none;border-color:rgba(0,230,118,.4)}
+.search-wrap{min-width:160px}
+
+/* THRESHOLD PANEL */
+.thresh-panel{margin-top:14px;padding-top:14px;border-top:1px solid var(--b)}
+.thresh-title{font-size:.7rem;color:var(--mu);font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
+.thresh-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:700px){.thresh-grid{grid-template-columns:repeat(2,1fr)}}
+.tcard{border:1px solid var(--b);border-radius:10px;padding:12px 14px;cursor:pointer;transition:all .2s;background:transparent;position:relative;overflow:hidden}
+.tcard::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,230,118,.08),transparent);opacity:0;transition:opacity .2s}
+.tcard:hover::before,.tcard.on::before{opacity:1}
+.tcard.on{border-color:var(--g);background:rgba(0,230,118,.05)}
+.tcard.on .tc-pct{color:var(--g)}
+.tc-pct{font-family:var(--mono);font-weight:700;font-size:1.3rem;color:var(--mu);transition:color .2s;line-height:1}
+.tc-desc{font-family:var(--mono);font-size:.72rem;color:var(--mu);margin-top:4px;line-height:1.4}
+.tc-badge{display:inline-block;margin-top:6px;padding:2px 7px;border-radius:4px;font-family:var(--mono);font-size:.65rem;font-weight:700}
+.tc-badge.fast{background:rgba(255,61,90,.2);color:var(--r)}
+.tc-badge.med{background:rgba(255,179,0,.2);color:var(--am)}
+.tc-badge.slow{background:rgba(68,138,255,.2);color:var(--bl)}
+
+.sorts{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-left:auto}
+.smu{font-size:.7rem;color:var(--mu);font-family:var(--mono)}
+.sb{padding:6px 11px;border-radius:7px;border:1px solid var(--b);background:transparent;color:var(--mu);font-family:var(--mono);font-size:.73rem;cursor:pointer;transition:all .2s}
+.sb:hover{color:var(--tx)}.sb.on{background:var(--s2);border-color:rgba(0,230,118,.3);color:var(--g)}
+
+/* GRID */
+.grid{display:grid;grid-template-columns:1fr 360px;gap:14px}
+@media(max-width:1000px){.grid{grid-template-columns:1fr}}
+
+/* TABLE */
+.tw{background:var(--s1);border:1px solid var(--b);border-radius:12px;overflow:hidden}
+.th{display:grid;grid-template-columns:1.8fr 1.3fr 1fr 1fr 1.1fr .9fr;padding:11px 18px;border-bottom:1px solid var(--b);font-size:.68rem;font-family:var(--mono);color:var(--mu);text-transform:uppercase;letter-spacing:.08em;background:var(--s1)}
+@media(max-width:620px){
+  .th{grid-template-columns:1.5fr 1fr 1fr}
+  .hv,.ht,.hm,.cv,.ct,.cm{display:none!important}
+  .cr{grid-template-columns:1.5fr 1fr 1fr!important}
+}
+.tbd{max-height:560px;overflow-y:auto}
+.tbd::-webkit-scrollbar{width:4px}.tbd::-webkit-scrollbar-thumb{background:var(--mu2);border-radius:2px}
+.cr{display:grid;grid-template-columns:1.8fr 1.3fr 1fr 1fr 1.1fr .9fr;padding:11px 18px;border-bottom:1px solid var(--b);align-items:center;transition:background .12s}
+.cr:hover{background:var(--s2)}.cr:last-child{border-bottom:none}
+/* alert highlight levels */
+.cr.al1{border-left:2px solid var(--am)}
+.cr.al2{border-left:3px solid rgba(255,100,0,.8);background:rgba(255,100,0,.04)}
+.cr.al3{border-left:3px solid var(--r);background:rgba(255,61,90,.05)}
+.cn{font-weight:700;font-size:.88rem;display:flex;align-items:center;gap:6px}
+.csym{color:var(--tx)}.cname{color:var(--mu);font-size:.73rem}
+.cp{font-family:var(--mono);font-size:.84rem}
+.cp.flash-up{animation:flup .7s ease}
+.cp.flash-dn{animation:fldn .7s ease}
+@keyframes flup{0%,100%{color:inherit}30%{color:var(--g)}}
+@keyframes fldn{0%,100%{color:inherit}30%{color:var(--r)}}
+/* Δ% since alert anchor */
+.cc{font-family:var(--mono);font-weight:700;font-size:.86rem;display:flex;align-items:center;gap:4px}
+.cc.up{color:var(--g)}.cc.dn{color:var(--r)}.cc.fl{color:var(--mu)}
+/* Δ% since last alert trigger */
+.ca{font-family:var(--mono);font-size:.8rem}
+.ca.up{color:rgba(0,230,118,.7)}.ca.dn{color:rgba(255,61,90,.7)}.ca.fl{color:var(--mu)}
+.cv{font-family:var(--mono);font-size:.78rem;color:var(--mu)}
+.ct{font-family:var(--mono);font-size:.74rem;color:var(--mu)}
+.bar{display:inline-block;width:28px;height:3px;border-radius:2px;background:var(--mu2);position:relative;overflow:hidden;flex-shrink:0}
+.barf{position:absolute;top:0;left:0;height:100%;border-radius:2px;transition:width .5s}
+.loader{display:flex;align-items:center;justify-content:center;padding:70px;color:var(--mu);font-family:var(--mono);font-size:.83rem;gap:12px;flex-direction:column;text-align:center;line-height:2}
+.spin{width:20px;height:20px;border:2px solid var(--mu2);border-top-color:var(--g);border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* HISTORY */
+.hp{background:var(--s1);border:1px solid var(--b);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;max-height:660px}
+.ph{padding:13px 18px;border-bottom:1px solid var(--b);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.pt{font-size:.85rem;font-weight:700}
+.pc{font-size:.7rem;font-family:var(--mono);color:var(--mu);cursor:pointer;background:none;border:none;padding:3px 7px;border-radius:5px;transition:color .2s}
+.pc:hover{color:var(--r)}
+.hlst{overflow-y:auto;flex:1}
+.hlst::-webkit-scrollbar{width:3px}.hlst::-webkit-scrollbar-thumb{background:var(--mu2)}
+.hi{padding:11px 18px;border-bottom:1px solid var(--b);display:grid;grid-template-columns:1fr auto;gap:2px 8px;animation:ri .3s ease}
+@keyframes ri{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:none}}
+.hi:hover{background:var(--s2)}.hi:last-child{border-bottom:none}
+.hs{font-weight:700;font-size:.86rem;grid-column:1}
+.hc{font-family:var(--mono);font-weight:700;font-size:.82rem;grid-column:2;text-align:right}
+.hc.up{color:var(--g)}.hc.dn{color:var(--r)}
+.hmeta{font-family:var(--mono);font-size:.68rem;color:var(--mu);grid-column:1}
+.hspd{font-size:.68rem;grid-column:2;text-align:right;font-family:var(--mono)}
+.hspd.fast{color:var(--r)}.hspd.med{color:var(--am)}.hspd.slow{color:var(--bl)}
+.he{padding:40px 18px;text-align:center;color:var(--mu);font-size:.82rem;font-family:var(--mono);line-height:1.8}
+
+/* TOAST */
+#ts{position:fixed;bottom:20px;right:20px;z-index:1000;display:flex;flex-direction:column-reverse;gap:8px;max-width:min(380px,calc(100vw - 40px))}
+.toast{padding:14px 16px;border-radius:12px;border:1px solid;backdrop-filter:blur(20px);cursor:pointer;animation:tin .35s cubic-bezier(.34,1.56,.64,1) both;display:flex;align-items:flex-start;gap:10px}
+@keyframes tin{from{opacity:0;transform:translateX(50px) scale(.95)}to{opacity:1;transform:none}}
+.toast.up{background:rgba(0,12,5,.95);border-color:rgba(0,230,118,.5);color:var(--g)}
+.toast.dn{background:rgba(12,0,4,.95);border-color:rgba(255,61,90,.5);color:var(--r)}
+.ti{font-size:1.2rem;flex-shrink:0;margin-top:1px}
+.ttl{font-weight:700;font-family:var(--mono);font-size:.9rem}
+.tsub{color:rgba(255,255,255,.45);font-family:var(--mono);font-size:.74rem;margin-top:3px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="topbar">
+  <div class="logo"><div class="ldot"></div>CryptoWatch</div>
+  <div class="badge wait" id="badge"><div class="bdot"></div><span id="btxt">Подключение…</span></div>
+  <div class="nxt" id="nxt"></div>
+</div>
+
+<div class="stats">
+  <div class="sc"><div class="sl">USDT пар</div><div class="sv w" id="sT">0</div></div>
+  <div class="sc"><div class="sl">Алертов</div><div class="sv b" id="sA">0</div></div>
+  <div class="sc"><div class="sl">Ростов 🟢</div><div class="sv g" id="sR">0</div></div>
+  <div class="sc"><div class="sl">Падений 🔴</div><div class="sv r" id="sF">0</div></div>
+</div>
+
+<div class="controls">
+  <div class="ctrl-row">
+    <div>
+      <div class="cl">Мин. объём 24ч (USDT)</div>
+      <input class="ci" type="number" id="minV" value="1000000">
+    </div>
+    <div class="search-wrap">
+      <div class="cl">Поиск монеты</div>
+      <input class="ci" type="text" id="search" placeholder="BTC, ETH…" style="width:160px">
+    </div>
+    <div class="sorts">
+      <span class="smu">Сорт:</span>
+      <button class="sb on" data-s="volume">Объём</button>
+      <button class="sb" data-s="change">Δ%</button>
+      <button class="sb" data-s="name">A–Z</button>
+      <button class="sb" data-s="price">Цена</button>
+    </div>
+  </div>
+
+  <!-- THRESHOLD CARDS -->
+  <div class="thresh-panel">
+    <div class="thresh-title">Порог уведомления — при каком росте/падении присылать алерт:</div>
+    <div class="thresh-grid" id="threshGrid"></div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="tw">
+    <div class="th">
+      <div>Монета</div>
+      <div>Цена</div>
+      <div>Δ% сейчас</div>
+      <div class="hm">+Δ с алерта</div>
+      <div class="hv">Объём 24ч</div>
+      <div class="ht">Обновлено</div>
+    </div>
+    <div class="tbd" id="tbd">
+      <div class="loader"><div class="spin"></div>Загружаем USDT пары с Binance…</div>
+    </div>
+  </div>
+
+  <div class="hp">
+    <div class="ph">
+      <div class="pt">📋 История алертов</div>
+      <button class="pc" id="clr">Очистить</button>
+    </div>
+    <div class="hlst" id="hlst">
+      <div class="he">Алертов пока нет.<br>Ждём резких движений…</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div id="ts"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  CryptoWatch v4 — Smart Alert System
+//
+//  ЛОГИКА АЛЕРТОВ:
+//  • Держим "якорную" цену на момент последнего алерта
+//  • Когда Δ% от якоря превышает порог → алерт
+//  • После алерта якорь НЕ сбрасывается — следующий алерт
+//    придёт когда движение достигнет 2× порога, затем 3× и т.д.
+//  • Это означает: выбрал 5% → алерты на 5%, 10%, 15%, 20%…
+//  • Якорь сбрасывается только при смене направления
+//
+//  ВРЕМЕННОЙ ОКНО:
+//  • Цены обновляются каждые 5 сек
+//  • Якорь устанавливается при первом получении данных по монете
+//  • Нет жёсткого "за N минут" — отслеживается непрерывное движение
+//  • В таблице показываем Δ% от якоря и Δ% от предыдущего алерта
+// ════════════════════════════════════════════════════════════
+
+const BINANCE  = 'https://api.binance.com/api/v3/ticker/24hr';
+const POLL_MS  = 5000;
+
+// Threshold presets
+// th     — порог алерта (%)
+// label  — название
+// desc   — подсказка пользователю
+// speed  — fast/med/slow (цвет бейджа)
+// minVol — рекомендуемый мин. объём
+const PRESETS = [
+  {th:1,  label:'1%',  desc:'Скальпинг, быстрые сделки',       speed:'fast', rec:'$500K+'},
+  {th:2,  label:'2%',  desc:'Внутридневные движения',           speed:'fast', rec:'$1M+'},
+  {th:5,  label:'5%',  desc:'Swing-трейдинг, сильные движения', speed:'med',  rec:'$2M+'},
+  {th:10, label:'10%', desc:'Крупные импульсы',                 speed:'slow', rec:'$5M+'},
+];
+let preset = 1; // default: 2%
+
+// State
+const coins   = new Map(); // sym → coinObj
+const anchors = new Map(); // sym → {price, dir, nextMult, prevAlertChg}
+// anchor: якорная цена от которой считаем Δ%
+// dir: 'up'|'dn'|null — текущее направление движения
+// nextMult: следующий множитель (1,2,3…) — когда сработает следующий алерт
+// prevAlertChg: Δ% на момент последнего алерта (для отображения "+Δ с алерта")
+
+let alertLog  = [];
+let cnt       = {r:0, f:0};
+let sort      = {k:'volume', d:true};
+let rPend     = false;
+let firstPoll = true;
+let audioCtx  = null;
+let searchQ   = '';
+
+// DOM
+const tbd  = document.getElementById('tbd');
+const hlst = document.getElementById('hlst');
+const badge= document.getElementById('badge');
+const btxt = document.getElementById('btxt');
+const nxt  = document.getElementById('nxt');
+
+// ── Build threshold cards ────────────────────────────────
+(()=>{
+  const grid = document.getElementById('threshGrid');
+  PRESETS.forEach((p,i)=>{
+    const el = document.createElement('div');
+    el.className = 'tcard'+(i===preset?' on':'');
+    el.dataset.i = i;
+    el.innerHTML = `
+      <div class="tc-pct">${p.label}</div>
+      <div class="tc-desc">${p.desc}</div>
+      <div><span class="tc-badge ${p.speed}">${p.speed==='fast'?'⚡ Быстро':p.speed==='med'?'📊 Средне':'🐢 Редко'}</span></div>
+      <div style="font-family:var(--mono);font-size:.65rem;color:var(--mu);margin-top:4px">Объём: ${p.rec}</div>`;
+    el.onclick = ()=>{
+      preset = i;
+      grid.querySelectorAll('.tcard').forEach(x=>x.classList.toggle('on',+x.dataset.i===i));
+      // Reset anchors on threshold change so we don't get stale alerts
+      anchors.clear();
+    };
+    grid.appendChild(el);
+  });
+})();
+
+// ── Sort buttons ─────────────────────────────────────────
+document.querySelectorAll('.sb').forEach(b=>{
+  b.onclick = ()=>{
+    const k=b.dataset.s;
+    sort.k===k?sort.d=!sort.d:(sort.k=k,sort.d=true);
+    document.querySelectorAll('.sb').forEach(x=>x.classList.toggle('on',x.dataset.s===k));
+    schedRender();
+  };
+});
+document.getElementById('minV').addEventListener('input', schedRender);
+document.getElementById('search').addEventListener('input', e=>{
+  searchQ=e.target.value.trim().toUpperCase();
+  schedRender();
+});
+document.getElementById('clr').onclick=()=>{
+  alertLog=[];cnt={r:0,f:0};save();updStats();renderHist();
+};
+
+// ── Audio ────────────────────────────────────────────────
+function getAC(){
+  if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  return audioCtx;
+}
+function beep(up, intensity=1){
+  // intensity 1,2,3 = louder/more notes for bigger moves
+  try{
+    const ctx=getAC();
+    const base = up?[440,554,659]:[659,554,440];
+    const extra = intensity>=2?(up?[880]:[330]):[];
+    [...base,...extra].forEach((f,i)=>{
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.connect(g);g.connect(ctx.destination);
+      o.frequency.value=f;o.type='sine';
+      const vol=Math.min(0.3,0.15*intensity);
+      const t=ctx.currentTime+i*0.13;
+      g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(vol,t+0.07);
+      g.gain.linearRampToValueAtTime(0,t+0.3);
+      o.start(t);o.stop(t+0.3);
+    });
+  }catch(e){}
+}
+document.addEventListener('click',()=>{try{getAC().resume();}catch(e){}},{once:true});
+
+// ── Poll Binance ─────────────────────────────────────────
+async function poll(){
+  try{
+    const res=await fetch(BINANCE,{cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const all=await res.json();
+    const usdt=all.filter(t=>t.symbol.endsWith('USDT'));
+    process(usdt);
+    setStatus('ok',`✅ Binance · ${usdt.length} пар · 5с`);
+    nxt.textContent='Обн. '+new Date().toLocaleTimeString();
+  }catch(err){
+    setStatus('err','⚠ '+err.message);
+  }
+  setTimeout(poll,POLL_MS);
+}
+
+function process(tickers){
+  const now   = Date.now();
+  const minV  = parseFloat(document.getElementById('minV').value)||0;
+  const th    = PRESETS[preset].th;
+
+  tickers.forEach(t=>{
+    const sym   = t.symbol;
+    const price = parseFloat(t.lastPrice);
+    const vol   = parseFloat(t.quoteVolume);
+    if(!price||isNaN(price)) return;
+
+    const prev = coins.get(sym);
+    const prevPrice = prev?prev.price:price;
+
+    // ── Anchor logic ──────────────────────────────────────
+    if(!anchors.has(sym)){
+      // First time we see this coin — set anchor
+      anchors.set(sym,{price, dir:null, nextMult:1, prevAlertChg:0});
+    }
+    const anc = anchors.get(sym);
+
+    // Δ% from anchor
+    const chgFromAnc = ((price - anc.price) / anc.price) * 100;
+    const curDir = chgFromAnc > 0.1 ? 'up' : chgFromAnc < -0.1 ? 'dn' : anc.dir;
+
+    // Direction reversal → reset anchor to current price
+    if(anc.dir && curDir && curDir !== anc.dir){
+      anc.price       = price;
+      anc.nextMult    = 1;
+      anc.prevAlertChg= 0;
+      anc.dir         = curDir;
+    } else {
+      anc.dir = curDir;
+    }
+
+    // Recompute after possible reset
+    const delta = ((price - anc.price) / anc.price) * 100;
+
+    // Store coin
+    coins.set(sym,{sym, price, prevPrice, vol, delta, ts:now,
+      sinceLastAlert: delta - anc.prevAlertChg});
+
+    // ── Alert check ───────────────────────────────────────
+    // Skip very first poll (no meaningful history)
+    if(!firstPoll && vol>=minV){
+      const target = th * anc.nextMult; // next milestone: 1×, 2×, 3×…
+      if(Math.abs(delta) >= target){
+        // Trigger!
+        const intensity = Math.min(3, anc.nextMult);
+        anc.prevAlertChg = delta;
+        anc.nextMult++;       // next alert at th×2, th×3…
+        doAlert(sym, delta, anc.nextMult-1, intensity, vol>=minV);
+      }
+    }
+  });
+
+  firstPoll=false;
+  schedRender();
+}
+
+// ── Alert ────────────────────────────────────────────────
+function doAlert(sym, chg, mult, intensity, volOk){
+  const up=chg>0;
+  if(up) cnt.r++; else cnt.f++;
+  const base=sym.replace('USDT','');
+  const th=PRESETS[preset].th;
+  const entry={sym:base, chg, mult, tf:PRESETS[preset].label, ts:new Date(), up, intensity};
+  alertLog.unshift(entry);
+  if(alertLog.length>500) alertLog.pop();
+  save(); updStats(); renderHist();
+  showToast(entry); beep(up,intensity); nativeNotif(entry);
+}
+
+function showToast(e){
+  const stack=document.getElementById('ts');
+  const d=document.createElement('div');
+  d.className='toast '+(e.up?'up':'dn');
+  const multBadge = e.mult>1?` (×${e.mult})`:'';
+  d.innerHTML=`<div class="ti">${e.up?'📈':'📉'}</div>
+<div>
+  <div class="ttl">${e.sym} ${e.up?'+':''}${e.chg.toFixed(2)}%${multBadge}</div>
+  <div class="tsub">${e.up?'Рост продолжается':'Падение продолжается'} · порог ${e.tf}
+  ${e.mult>1?`<br>⚠ Это уже ${e.mult}-е подряд уведомление!`:''}</div>
+</div>`;
+  stack.appendChild(d);
+  d.onclick=()=>d.remove();
+  setTimeout(()=>{
+    d.style.opacity='0';d.style.transition='opacity .4s';setTimeout(()=>d.remove(),400);
+  },8000);
+  while(stack.children.length>5) stack.firstChild.remove();
+}
+
+function nativeNotif(e){
+  if(!('Notification' in window)||Notification.permission!=='granted') return;
+  try{
+    const multBadge=e.mult>1?` (уже ${e.mult}× подряд)`:'';
+    new Notification(`${e.up?'📈':'📉'} ${e.sym} ${e.up?'+':''}${e.chg.toFixed(2)}%${multBadge}`,{
+      body:`${e.up?'Растёт':'Падает'} · порог ${e.tf}${e.mult>1?'\n⚠ Движение продолжается!':''}`,
+      tag:e.sym+'_'+e.mult, renotify:true
+    });
+  }catch(ex){}
+}
+
+// ── Render table ─────────────────────────────────────────
+function schedRender(){
+  if(rPend)return;rPend=true;
+  requestAnimationFrame(()=>{rPend=false;renderTable();});
+}
+
+const rowEls=new Map();
+
+function renderTable(){
+  const minV=parseFloat(document.getElementById('minV').value)||0;
+  const th=PRESETS[preset].th;
+
+  let rows=Array.from(coins.values()).filter(c=>{
+    if(c.vol<minV)return false;
+    if(searchQ&&!c.sym.includes(searchQ))return false;
+    return true;
+  });
+
+  rows.sort((a,b)=>{
+    if(sort.k==='volume') return sort.d?b.vol-a.vol:a.vol-b.vol;
+    if(sort.k==='change') return sort.d?Math.abs(b.delta)-Math.abs(a.delta):Math.abs(a.delta)-Math.abs(b.delta);
+    if(sort.k==='name')   return sort.d?b.sym.localeCompare(a.sym):a.sym.localeCompare(b.sym);
+    if(sort.k==='price')  return sort.d?b.price-a.price:a.price-b.price;
+    return 0;
+  });
+
+  document.getElementById('sT').textContent=rows.length;
+  document.getElementById('sU')||'';
+
+  if(!rows.length){
+    tbd.innerHTML='<div class="loader">Нет монет по фильтрам</div>';
+    rowEls.clear();return;
+  }
+
+  // Remove stale rows
+  const active=new Set(rows.map(r=>r.sym));
+  rowEls.forEach((_,sym)=>{if(!active.has(sym)){rowEls.get(sym).row.remove();rowEls.delete(sym);}});
+
+  const frag=document.createDocumentFragment();
+  rows.forEach(c=>{
+    const base=c.sym.replace('USDT','');
+    const up=c.delta>0.05,dn=c.delta<-0.05;
+    const cls=up?'up':dn?'dn':'fl';
+    const sign=up?'+':dn?'':'';
+    const th=PRESETS[preset].th;
+    const bw=Math.min(100,Math.abs(c.delta)/Math.max(th*2,0.1)*100);
+    const bc=up?'var(--g)':'var(--r)';
+    // alert row level
+    const alMult=Math.floor(Math.abs(c.delta)/th);
+    const alCls=alMult>=3?'al3':alMult>=2?'al2':alMult>=1?'al1':'';
+    // since last alert column
+    const sal=c.sinceLastAlert||0;
+    const salCls=sal>0.05?'up':sal<-0.05?'dn':'fl';
+    const salStr=sal!==0?((sal>0?'+':'')+sal.toFixed(2)+'%'):'—';
+
+    const priceStr='$'+fmtP(c.price);
+    const chgStr=sign+c.delta.toFixed(2)+'%';
+    const volStr=fmtV(c.vol);
+    const timeStr=fmtT(c.ts);
+
+    if(rowEls.has(c.sym)){
+      const {row,priceEl,chgEl,salEl,volEl,timeEl,barFill}=rowEls.get(c.sym);
+      if(c.price!==c.prevPrice){
+        priceEl.textContent=priceStr;
+        priceEl.classList.remove('flash-up','flash-dn');
+        void priceEl.offsetWidth;
+        priceEl.classList.add(c.price>c.prevPrice?'flash-up':'flash-dn');
+      }
+      chgEl.className='cc '+cls;
+      chgEl.childNodes[0].textContent=chgStr;
+      barFill.style.width=bw+'%';
+      barFill.style.background=bc;
+      salEl.className='ca '+salCls;
+      salEl.textContent=salStr;
+      volEl.textContent=volStr;
+      timeEl.textContent=timeStr;
+      row.className='cr'+(alCls?' '+alCls:'');
+      frag.appendChild(row);
+    } else {
+      const row=document.createElement('div');
+      row.className='cr'+(alCls?' '+alCls:'');
+
+      const nameEl=document.createElement('div');
+      nameEl.className='cn';
+      nameEl.innerHTML=`<span class="csym">${base}</span><span class="cname">/USDT</span>`;
+
+      const priceEl=document.createElement('div');
+      priceEl.className='cp';priceEl.textContent=priceStr;
+
+      const barFill=document.createElement('span');
+      barFill.className='barf';barFill.style.width=bw+'%';barFill.style.background=bc;
+      const bar=document.createElement('span');
+      bar.className='bar';bar.appendChild(barFill);
+
+      const chgEl=document.createElement('div');
+      chgEl.className='cc '+cls;
+      chgEl.appendChild(document.createTextNode(chgStr));
+      chgEl.appendChild(bar);
+
+      const salEl=document.createElement('div');
+      salEl.className='ca '+salCls;salEl.textContent=salStr;
+
+      const volEl=document.createElement('div');
+      volEl.className='cv';volEl.textContent=volStr;
+
+      const timeEl=document.createElement('div');
+      timeEl.className='ct';timeEl.textContent=timeStr;
+
+      row.appendChild(nameEl);row.appendChild(priceEl);row.appendChild(chgEl);
+      row.appendChild(salEl);row.appendChild(volEl);row.appendChild(timeEl);
+      rowEls.set(c.sym,{row,priceEl,chgEl,salEl,volEl,timeEl,barFill});
+      frag.appendChild(row);
+    }
+  });
+
+  tbd.innerHTML='';
+  tbd.appendChild(frag);
+}
+
+// ── Render history ────────────────────────────────────────
+function renderHist(){
+  if(!alertLog.length){
+    hlst.innerHTML='<div class="he">Алертов пока нет.<br>Ждём резких движений…</div>';
+    return;
+  }
+  const frag=document.createDocumentFragment();
+  alertLog.slice(0,150).forEach(a=>{
+    const el=document.createElement('div');
+    el.className='hi';
+    const multStr=a.mult>1?` ×${a.mult}`:'';
+    const spdCls=a.intensity>=3?'fast':a.intensity>=2?'med':'slow';
+    const spdTxt=a.intensity>=3?'⚡ Сильное':a.intensity>=2?'📊 Среднее':'💤 Слабое';
+    el.innerHTML=`
+      <div class="hs">${a.sym}${multStr?`<span style="color:var(--am);font-size:.75rem;margin-left:6px">${multStr}</span>`:''}</div>
+      <div class="hc ${a.up?'up':'dn'}">${a.up?'+':''}${a.chg.toFixed(2)}%</div>
+      <div class="hmeta">${a.ts.toLocaleTimeString()} · порог ${a.tf}</div>
+      <div class="hspd ${spdCls}">${spdTxt}</div>`;
+    frag.appendChild(el);
+  });
+  hlst.innerHTML='';
+  hlst.appendChild(frag);
+}
+
+function updStats(){
+  document.getElementById('sA').textContent=cnt.r+cnt.f;
+  document.getElementById('sR').textContent=cnt.r;
+  document.getElementById('sF').textContent=cnt.f;
+}
+
+// ── Helpers ───────────────────────────────────────────────
+function setStatus(cls,txt){badge.className='badge '+cls;btxt.textContent=txt;}
+function fmtP(p){
+  if(p>=10000) return p.toLocaleString('en-US',{maximumFractionDigits:0});
+  if(p>=1)     return p.toFixed(4);
+  if(p>=0.001) return p.toFixed(5);
+  return p.toFixed(8);
+}
+function fmtV(v){
+  if(v>=1e9) return(v/1e9).toFixed(2)+'B';
+  if(v>=1e6) return(v/1e6).toFixed(1)+'M';
+  if(v>=1e3) return(v/1e3).toFixed(0)+'K';
+  return v.toFixed(0);
+}
+function fmtT(ts){return new Date(ts).toLocaleTimeString();}
+
+// ── Persistence ───────────────────────────────────────────
+function save(){
+  try{
+    localStorage.setItem('cw4_log',JSON.stringify(alertLog.slice(0,300)));
+    localStorage.setItem('cw4_cnt',JSON.stringify(cnt));
+  }catch(e){}
+}
+function loadSaved(){
+  try{
+    const l=localStorage.getItem('cw4_log');
+    const c=localStorage.getItem('cw4_cnt');
+    if(l){alertLog=JSON.parse(l).map(a=>({...a,ts:new Date(a.ts)}));renderHist();}
+    if(c){cnt=JSON.parse(c);updStats();}
+  }catch(e){}
+}
+
+// ── Init ──────────────────────────────────────────────────
+loadSaved();
+if('Notification' in window&&Notification.permission==='default'){
+  Notification.requestPermission();
+}
+setStatus('wait','Загружаем USDT пары…');
+poll();
+</script>
+</body>
+</html>
